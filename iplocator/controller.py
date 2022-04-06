@@ -1,14 +1,20 @@
 from tkinter import Tk
-from iplocator import model
 from iplocator.view import View
 from iplocator.model import Model
 
 class Controller:
     def __init__(self):
         self.root = Tk()
-        self.root.geometry("1920x1080")
+        self.root.state("zoomed")
+        self.root.resizable(False, False)
         self.root.title("Geolocalizador de IPs ATS")
+
+        width = self.root.winfo_screenwidth()
+        height = self.root.winfo_screenheight()
+        self.root.geometry("{}x{}".format(width, height))
+                
         self.model = Model()
-        self.view = View(self.root, self.model)
+        self.view = View(self.root, self.model, width, height)
+    
     def run(self):
         self.root.mainloop()
