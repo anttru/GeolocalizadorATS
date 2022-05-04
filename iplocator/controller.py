@@ -13,8 +13,9 @@ class Controller:
         height = self.root.winfo_screenheight()
         self.root.geometry("{}x{}".format(width, height))
                 
-        self.model = Model()
+        self.model = Model(self.root)
         self.view = View(self.root, self.model, width, height)
+        self.model.view = self.view
     
     def run(self):
         self.root.mainloop()
