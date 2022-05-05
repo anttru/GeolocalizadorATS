@@ -1,11 +1,13 @@
 import tkinter
-from tkinter import W, StringVar, ttk
+from tkinter import ttk
 from tkinter.messagebox import showinfo
 from tkintermapview import TkinterMapView
 from iplocator import FONT, SMALLERFONT
 from iplocator.model import Model
 
+#Esta clase se encarga de mostrar en la ventana los elementos y los datos obtenidos del modelo
 class View:
+    #Se crean las estructuras de datos y se llaman a funciones que se encargan de crear los elementos, se esconden los que corresponde
     def __init__(self, root : tkinter.Tk, model: Model, width, height):
         self.root = root
         self.model = model
@@ -15,47 +17,48 @@ class View:
         self.width = width
         self.height = height
         self.data = {}
+        self.targetip = None
         self.valuestoip = {}
 
-        self.buttonsframe = tkinter.Frame(root, width = width/4, height = height)
-        self.mapframe = tkinter.Frame(root, width = width * 3/4, height = height)
+        self.createelements()
+        self.createresultsform()
+        self.hideform()
+
+    #Esta función crea los elementos de la ventana
+    def createelements(self):
+        self.buttonsframe = tkinter.Frame(self.root, width = self.width/4, height = self.height)
+        self.buttonsframe.place(x= self.width*3/4, y = 0)
         
-        self.map_widget = TkinterMapView(self.mapframe, width = width * 3/4, height = height, corner_radius = 0)
+        self.mapframe = tkinter.Frame(self.root, width = self.width * 3/4, height = self.height)
+        self.mapframe.place(x = 0, y = 0)
+        
+        self.map_widget = TkinterMapView(self.mapframe, width = self.width * 3/4, height = self.height, corner_radius = 0)
         self.map_widget.place(relx = 0.5, rely = 0.5, anchor=tkinter.CENTER)
         self.map_widget.set_zoom(0)
-
-        self.buttonsframe.place(x= width*3/4, y = 0)
-        self.mapframe.place(x = 0, y = 0)
-
+        
         self.labelIp = tkinter.Label(self.buttonsframe, text = "Escriba la IP objetivo:", font =FONT)
-        #self.labelIp.pack(ipadx=20, ipady=20)
         self.labelIp.grid(column= 0, row= 0, sticky= tkinter.W, columnspan=2,padx= 20, pady = 20)
 
         self.targetIp = tkinter.StringVar()
         self.ipentry = tkinter.Entry(self.buttonsframe, textvariable=self.targetIp, font = FONT, width = 25)
-        #self.ipentry.pack(fill = "x")
         self.ipentry.grid(column=0, row= 1, sticky=tkinter.W, columnspan=2, padx= 10)
         
         self.sendButton = tkinter.Button(self.buttonsframe, text = "Localizar", font = FONT, command = self.placeroute)
-        #self.sendButton.pack(side = "left")
         self.sendButton.grid(column=0, row=2, sticky= tkinter.W, pady= 10, padx = 5)
 
-        self.button = tkinter.Button(self.buttonsframe, text = "Borrar Todo", font = FONT, command = self.deletemarkers)
-        #self.button.pack(side = "right")
+        self.button = tkinter.Button(self.buttonsframe, text = "Borrar Todo", font = FONT, command = self.cleareverything)
         self.button.grid(column=1, row= 2, pady= 10, padx = 5)
         
-        self.progressbar = ttk.Progressbar(self.buttonsframe, orient='horizontal', mode='determinate', length= width//8, maximum=30, value= 0)
+        self.progressbar = ttk.Progressbar(self.buttonsframe, orient='horizontal', mode='determinate', length= self.width//8, maximum=30, value= 0)
         self.progressbar.grid(column=0, row = 3, columnspan= 2, sticky= tkinter.W)
 
         self.progresslabel = ttk.Label(self.buttonsframe, text = "Esperando entrada de IP")
         self.progresslabel.grid(column=0, row= 4, columnspan=2)
 
         self.dropdownmenu = ttk.Combobox( self.buttonsframe, state = "readonly", width = 50)
-        self.dropdownmenu.bind("<<ComboboxSelected>>", self.showinfo)
+        self.dropdownmenu.bind("<<ComboboxSelected>>", self.showinfo) #Cuando se selecciona una opción llama a showinfo
         self.dropdownmenu.grid(column = 0, row = 5, columnspan=2, sticky= tkinter.W)
-        self.createresultsform()
-        self.hideform()
-        
+
     def createresultsform(self):
         #Esta funcion contiene la creación y posicionamiento del formulario en el que se muestra la información de cada IP        
         #Creo las variables de texto que contendran la información
@@ -157,11 +160,13 @@ class View:
         self.orgentry.grid()
         self.asentry.grid()
 
+    #Actualiza las StringVar vinculadas a los Entrybox con los datos de los json obtenidos de la API según la IP seleccionada
+    #además coloca un marcador en la IP seleccionada y centra el mapa sobre ella con un zoom más cercano
     def showinfo(self,a):
         ip = self.valuestoips[self.dropdownmenu.get()]
         self.map_widget.delete(self.marker)
         self.marker = None
-        if ip == None:
+        if ip == None: #La IP es None cuando selecionamos la opción vacía de "selecione un router"
             self.hideform()
             self.dropdownmenu.grid()
             self.map_widget.set_zoom(0)
@@ -191,12 +196,9 @@ class View:
                 self.isptext.set("IP Privada")
                 self.orgtext.set("IP Privada")
                 self.astext.set("IP Privada")
-
-    def placeLocation(self):
-        ipdata = self.model.getIpData(self.targetIp.get())
-        self.markersList.append(self.map_widget.set_marker(ipdata["lat"], ipdata["lon"], text = self.targetIp.get()))
-
-    def deletemarkers(self):
+    
+    #Esta función devuelve todo al estado inicial y borra los elementos colocados sobre el mapa
+    def cleareverything(self):
         self.pathcoordslist = []
         if self.path != None:
             self.map_widget.delete(self.path)
@@ -207,6 +209,7 @@ class View:
         self.progresslabel["text"] = "Esperando entrada de IP"
         self.model.ipdata = []
         self.model.iplist = []
+        self.model.notreachedflag = False
         self.dropdownmenu["values"] = []
         self.data = {}
         self.valuestoips = {}
@@ -216,34 +219,49 @@ class View:
             self.map_widget.delete(self.marker)
             self.marker = None
         self.map_widget.set_zoom(0)
+        self.targetip = None
+        
 
+    #Esta función crea la lista de valores para el elemento combobox de selección de router
+    #también crea un diccionario para corresponder el texto de la selección con la ip que le corresponde
     def createdropdownvalues(self, iplist):
         values = ["Seleccione un router para ver su información"]
         counter = 1
         self.valuestoips = {"Seleccione un router para ver su información": None}
         for ip in iplist:
-            values.append("Router {} : {}".format(counter, ip))
-            self.valuestoips["Router {} : {}".format(counter, ip)] = ip
+            if ip != self.targetip:
+                values.append("Router {} : {}".format(counter, ip))
+                self.valuestoips["Router {} : {}".format(counter, ip)] = ip
+            else:
+                values.append("Router {} : {} (OBJETIVO)".format(counter, ip))
+                self.valuestoips["Router {} : {} (OBJETIVO)".format(counter, ip)] = ip
             counter += 1
         return values
 
-    def placeroute(self):
-        self.deletemarkers()
-        try:
-            self.model.getiplist(self.targetIp.get())
-            self.model.getipdata()
-        except Exception as e :
-            self.progresslabel["text"] =  e
-                    
-        self.markersList = []
+    #Muestra el camino en el mapa a partir de las coordenadas de cada IP
+    def showpath(self):
         for ip in self.model.ipdata:
-            self.root.update()
+            self.root.update() #actualiza la ventana en cada iteracion
             if ip["status"] == "success":
-                #self.markersList.append(self.map_widget.set_marker(ip["lat"], ip["lon"], text = ip["query"]))
                 self.pathcoordslist.append((ip["lat"], ip["lon"]))
         if len(self.pathcoordslist) > 0:
             self.path = self.map_widget.set_path(self.pathcoordslist)
-        self.data = dict(zip(self.model.iplist, self.model.ipdata))
-        self.dropdownmenu.grid()
+    
+    #esta función es llamada por el botón para realizar todo el proceso de obtención de datos y muestra sobre el mapa de la ruta
+    #si hay alguna excepción que impida realizar el proceso, se informa en la barra de progreso
+    #finalmente, monta el menu de selección de routers y crea una estructura de datos para rellenar el formulario
+    def placeroute(self):
+        self.cleareverything()
+        try:
+            self.targetip = self.model.getiplist(self.targetIp.get()) #guardamos la ip objetivo que devuelve getiplist como retorno para identificarla al crear el dropdown menu.
+            self.model.getipdatalist()
+            if self.model.notreachedflag == True: #Si no se alcanzó el objetivo se informa por la barra de progreso
+                self.progresslabel["text"] =  "No se ha alcanzado la IP objetivo, faltan routers intermedios"
+        except Exception as e :
+            self.progresslabel["text"] =  e
+        self.showpath()
+
+        self.data = dict(zip(self.model.iplist, self.model.ipdata)) #Se crea un diccionario en que la clave son las ips y los valores el diccionario (del json obtenido de la API) que contiene los datos de cada una 
+        self.dropdownmenu.grid() 
         self.dropdownmenu["values"] = self.createdropdownvalues(self.model.iplist)
         self.dropdownmenu.current(0)

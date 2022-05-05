@@ -10,29 +10,35 @@ class APIError(Exception):
     pass
 class SyntaxError(Exception):
     pass
+class ConnectionError(Exception):
+    pass
 
 class Model:
+    #Esta clase hará la parte de negocio, obtendra las IPs del camino y obtendrá sus datos de la API
+    #Creo las estructuras de datos que contendran la lista de IPs obtenidas y sus datos
     def __init__(self, root : Tk, view = None):
         self.targetIp = ""
         self.root = root
         self.iplist = []
         self.ipdata = []
+        self.notreachedflag = False #Indica si el tracert no llego a la IP objetivo
         self.view = view
-        
+
+    #Esta función obtiene los datos de una IP de la API usando requests, si no se obtiene respuesta lanza excepción
     def getIpData(self, ip):
         ipdata = requests.get(API_URL.format(ip))
         if ipdata.status_code != 200:
             raise APIError("failed to retrieve ip geolocation data from API")
         return ipdata.json()
 
-    
-    def getiplist(self, iporurl):
-        lines = []
-        self.iplist = []
+    def validateiporurl(self, iporurl):
+        #Se resuelve la url a una IP por DNS, si es una IP, nos devuelve la misma IP, si no existe, lanzamos excepción
         try:
             ip = gethostbyname(iporurl)
         except:
-            raise SyntaxError("URL no encontrada")
+            raise SyntaxError("URL o IP no válida")
+        #La clase IP de IPy da una excepción si se crea con una IP no válida
+        #también tiene métodos para sacar información sobre la IP, con ellos valido que la IP es valida, v4 y pública
         try :
             ipobject = IP(ip)
         except: 
@@ -41,31 +47,48 @@ class Model:
             raise SyntaxError("Sólo se aceptan IPv4s")
         if ipobject.iptype() != "PUBLIC":
             raise SyntaxError("Solo se aceptan IPs de rango público")
-        
-        p = subprocess.Popen(["tracert", "-w", "150", "-d", ip], stdout=subprocess.PIPE)
+        return ip
+
+    #Esta función obtiene las IPs haciendo un tracert a la ip objetivo y actualiza la barra de progreso
+    def getiplist(self, iporurl):
+        lines = []
+        self.iplist = []
+        ip = self.validateiporurl(iporurl)
+        #Lanzamos un subproceso  tracert con Popen.
+        tracertprocess = subprocess.Popen(["tracert", "-w", "150", "-d", ip], stdout=subprocess.PIPE)
         while True:
-            self.root.update()
-            line = p.stdout.readline()
+            self.root.update() #se actualiza la pantalla para que no se cuelgue tkinter al interrumpir el mainloop con el while
+            line = tracertprocess.stdout.readline() #recuperamos las líneas que genera tracert
             if not line:
                 break
             lines.append(str(line))
-            self.view.progressbar["value"] += 1
+            self.view.progressbar["value"] += 1  #actualizamos el valor de la barra de progreso
             self.view.progresslabel["text"] = "Hop {} de un máximo de 30".format(self.view.progressbar["value"] - 3)
+        self.iplist = self.extractIPs(lines) #extraemos las ips del texto del tracert
+        if self.iplist[-1] != ip: #Si no se ha llegado al objetivo, se añade pero se activa un flag para informar del error
+            self.iplist.append(ip)
+            self.notreachedflag = True
+        return ip #retornamos la ip objetivo para poder usarla en la vista
 
+        
+    def extractIPs(self, lines):
+        #esta función extrae IPs a partir de una expresión regular de una lista de líneas de texto    
+        iplist = []
         pattern = re.compile(IP_REGEX)       
         for line in lines:
             if pattern.search(line):
-                self.iplist.append(pattern.search(line)[0])
-        if len(self.iplist) > 1:
-            self.iplist.pop(0)
-        return self.iplist
+                iplist.append(pattern.search(line)[0])
+        if len(iplist) > 1:
+            iplist.pop(0) #la primera línea contiene la ip objetivo, que ya aparece en la última línea.
+        return iplist
 
-    def getipdata(self):
+    #Obtenemos los datos de todas las IPs y los guardamos en una lista, actualiza la barra de progreso
+    def getipdatalist(self):
         self.ipdata = []
         self.view.progressbar["maximum"] = len(self.iplist)
         self.view.progressbar["value"] = 0
         for ip in self.iplist:
-            self.root.update()    
+            self.root.update()    #Se actualiza la pantalla para que no se cuelgue tkinter
             self.ipdata.append(self.getIpData(ip))
             self.view.progressbar["value"] += 1
             self.view.progresslabel["text"] = "Obteniendo datos de IPs {} de {}".format( self.view.progressbar["value"], len(self.iplist))
