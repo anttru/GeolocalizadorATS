@@ -62,8 +62,9 @@ class Model:
             if not line:
                 break
             lines.append(str(line))
-            self.view.progressbar["value"] += 1  #actualizamos el valor de la barra de progreso
-            self.view.progresslabel["text"] = "Hop {} de un máximo de 30".format(self.view.progressbar["value"] - 3)
+            if ip != None and self.view != None: #Las interacciones con View se limitan al caso de que exista para poder usar este módulo independientemente.
+                self.view.progressbar["value"] += 1  #actualizamos el valor de la barra de progreso
+                self.view.progresslabel["text"] = "Hop {} de un máximo de 30".format(self.view.progressbar["value"] - 3)
         self.iplist = self.extractIPs(lines) #extraemos las ips del texto del tracert
         if self.iplist[-1] != ip: #Si no se ha llegado al objetivo, se añade pero se activa un flag para informar del error
             self.iplist.append(ip)
@@ -85,12 +86,15 @@ class Model:
     #Obtenemos los datos de todas las IPs y los guardamos en una lista, actualiza la barra de progreso
     def getipdatalist(self):
         self.ipdata = []
-        self.view.progressbar["maximum"] = len(self.iplist)
-        self.view.progressbar["value"] = 0
+        if self.view != None:
+            self.view.progressbar["maximum"] = len(self.iplist)
+            self.view.progressbar["value"] = 0
         for ip in self.iplist:
             self.root.update()    #Se actualiza la pantalla para que no se cuelgue tkinter
             self.ipdata.append(self.getIpData(ip))
-            self.view.progressbar["value"] += 1
-            self.view.progresslabel["text"] = "Obteniendo datos de IPs {} de {}".format( self.view.progressbar["value"], len(self.iplist))
-        self.view.progresslabel["text"] = "Completado con éxito"
+            if self.view != None: 
+                self.view.progressbar["value"] += 1
+                self.view.progresslabel["text"] = "Obteniendo datos de IPs {} de {}".format( self.view.progressbar["value"], len(self.iplist))
+        if self.view != None:
+            self.view.progresslabel["text"] = "Completado con éxito"
         return self.ipdata
