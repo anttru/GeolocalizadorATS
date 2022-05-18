@@ -1,13 +1,17 @@
 import tkinter
 from iplocator.view import View
 from iplocator.model import Model
+import platform
 
 class Controller:
     #Esta clase crea la vista y el controlador y los relaciona
     def __init__(self):
         #creo una ventana de tkinter a pantalla completa, tamaño no cambiable y con un título
         self.root = tkinter.Tk()
-        self.root.state("zoomed")
+        if platform.system() == "Windows":
+            self.root.state("zoomed")
+        else:
+            self.root.attributes("-zoomed", True)
         self.root.resizable(False, False)
         self.root.title("Geolocalizador de IPs ATS")
 
